@@ -4,25 +4,61 @@ import cv2
 from matplotlib import pyplot as plt
 
 
-def fft_image():
-    print("FTT of image.")
-    img = cv2.imread("img.jpg", 0)
-    f = np.fft.fft2(img)
+def fft_image(img_1, img_2):
 
-    f = cv2.dft(np.float32(img), flags=cv2.DFT_COMPLEX_OUTPUT)
-    f_shift = np.fft.fftshift(f)
-    f_complex = f_shift[:, :, 0] + 1j * f_shift[:, :, 1]
-    f_abs = np.abs(f_complex) + 1  # lie between 1 and 1e6
-    f_bounded = 20 * np.log(f_abs)
-    f_img = 255 * f_bounded / np.max(f_bounded)
-    f_img = f_img.astype(np.uint8)
+    fft2 = np.fft.fft2(img_1)
+    img_fft2 = np.log(1+np.abs(fft2))
+    fft2_2 = np.fft.fft2(img_2)
+    img_2_fft2 = np.log(1 + np.abs(fft2_2))
 
-    plt.subplot(131), plt.imshow(img, cmap='gray')
-    plt.title('Input Image'), plt.xticks([]), plt.yticks([])
-    plt.subplot(132), plt.imshow(f_img, cmap='gray')
-    plt.title('Image after HPF'), plt.xticks([]), plt.yticks([])
+    fft_shift = np.fft.fftshift(fft2)
+    img_fft_shift = np.log(1+np.abs(fft_shift))
+    fft_shift_2 = np.fft.fftshift(fft2_2)
+    img_2_fft_shift = np.log(1 + np.abs(fft_shift_2))
+
+    fft_ishift = np.fft.ifftshift(fft_shift)
+    img_fft_ishift = np.log(1+np.abs(fft_ishift))
+    fft_ishift_2 = np.fft.ifftshift(fft_shift)
+    img_2_fft_ishift = np.log(1 + np.abs(fft_ishift_2))
+
+    # plt.subplot(421), plt.imshow(img_1, cmap='gray')
+    # plt.title('Input Image 1'), plt.xticks([]), plt.yticks([])
+    # plt.subplot(422), plt.imshow(img_2, cmap='gray')
+    # plt.title('Input Image 2'), plt.xticks([]), plt.yticks([])
+    # plt.subplot(423), plt.imshow(img_fft2, cmap='gray')
+    # plt.title('After FFT 1'), plt.xticks([]), plt.yticks([])
+    # plt.subplot(424), plt.imshow(img_2_fft2, cmap='gray')
+    # plt.title('After FFT 2'), plt.xticks([]), plt.yticks([])
+    # plt.subplot(425), plt.imshow(img_fft_shift, cmap='gray')
+    # plt.title('After FFT shift 1'), plt.xticks([]), plt.yticks([])
+    # plt.subplot(426), plt.imshow(img_2_fft_shift, cmap='gray')
+    # plt.title('After FFT shift 2'), plt.xticks([]), plt.yticks([])
+    # plt.subplot(427), plt.imshow(img_fft_ishift, cmap='gray')
+    # plt.title('After FFT inverse shift 2'), plt.xticks([]), plt.yticks([])
+    # plt.subplot(428), plt.imshow(img_2_fft_ishift, cmap='gray')
+    # plt.title('After FFT inverse shift 2'), plt.xticks([]), plt.yticks([])
+    # plt.show()
+
+    phase = cv2.phaseCorrelate(np.float32(fft_ishift), np.float32(fft_ishift_2))
+    (rows, cols) = img_2.shape[:2]
+    res = cv2.warpAffine(img_2, phase, (rows, cols))
+    plt.subplot(311), plt.imshow(img_1)
+    plt.title("image 1"), plt.xticks([]), plt.yticks([])
+    plt.subplot(312), plt.imshow(img_2)
+    plt.title("image 2"), plt.xticks([]), plt.yticks([])
+    plt.subplot(313), plt.imshow(res)
+    plt.title("image 3"), plt.xticks([]), plt.yticks([])
     plt.show()
 
 
+def phase_correlation(img1, img2):
+    src1 = np.float32(img1)
+    src2 = np.float32(img2)
+    print(cv2.phaseCorrelate(src1, src2))
+
+
 if __name__ == '__main__':
-    fft_image()
+    img_1 = cv2.imread("images/retina.jpg", 0)
+    img_2 = cv2.imread("images/retina_posun.jpg", 0)
+    fft_image(img_1, img_2)
+    # phase_correlation(img_1, img_2)
