@@ -28,6 +28,7 @@ def stabilize_video(f_name):
     cnt = 0
     image1 = None
     print_results = []
+    first_i = None
 
     while True:
         ret, image2 = capture.read()
@@ -37,11 +38,12 @@ def stabilize_video(f_name):
             if first:
                 first = False
                 image1 = np.copy(image2)
+                first_i = image1
             else:
                 # perform stabilization
-                result, print_result = stabilize_picture(image1, image2, {})
+                result, print_result = stabilize_picture(first_i, image2, {})
                 score = jaccard_score(image1.flatten(), result.flatten(), average='macro')
-                print_result['score'] = score
+                print_result['score'] = round(score * 100, 2)
                 print_results.append(print_result)
                 vid_writer.write(result)
                 image1 = np.copy(result)
@@ -52,8 +54,9 @@ def stabilize_video(f_name):
         cnt += 1
 
     print("Done")
-    print_ordered("--result--", print_results)
-
+    # print_ordered("--result--", print_results)
+    av = sum(item.get('score', 0) for item in print_results) / len(print_results)
+    print("SCORE: ", round(av, 2))
     if capture.isOpened():
         capture.release()
 
