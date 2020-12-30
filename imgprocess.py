@@ -3,7 +3,8 @@ import cv2
 from matplotlib import pyplot as plt
 import collections
 import math
-from sklearn.metrics import jaccard_score
+from skimage import img_as_float
+from skimage.metrics import structural_similarity as ssim
 import time
 
 
@@ -27,6 +28,7 @@ def stabilize_video(f_name):
     :param f_name:  path to the video sample file
     """
     capture = cv2.VideoCapture(f_name)
+    frames = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
     frame_size = (int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)), int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
     fps = capture.get(cv2.CAP_PROP_FPS)
     vid_writer = get_video_writer(f_name + "_stabilized.avi", frame_size, fps)
@@ -52,24 +54,28 @@ def stabilize_video(f_name):
                 # perform stabilization
                 result, print_result = stabilize_picture(first_i, image2, {})
 
-                score = jaccard_score(image1.flatten(), result.flatten(), average='macro')
-                print_result['score'] = round(score * 100, 2)
+                ref_image = img_as_float(to_gray(image1))
+                res_image = img_as_float(to_gray(result))
+
+                print_result['score'] = ssim(ref_image, res_image, data_range=res_image.max() - res_image.min())
                 print_results.append(print_result)
+
+                if cnt % 10 == 0:
+                    print("\rRemain frames:", frames - cnt)
 
                 vid_writer.write(result)
                 image1 = np.copy(result)
         else:
             break
 
-        print("frame:", str(cnt), "duration:", round(time.time() - start_time, 3), "ms", end='\r')
         cnt += 1
 
     print("DONE")
-    print("DURATION:", round(time.time() - start_time, 3), "ms")
+    print("DURATION:", round(time.time() - start_time, 3), "s")
 
     # print_ordered("--result--", print_results)
     av = sum(item.get('score', 0) for item in print_results) / len(print_results)
-    print("JACCARD SCORE: ", round(av, 2))
+    print("SSIM AVERAGE: ", round(av, 3))
 
     if capture.isOpened():
         capture.release()
@@ -296,9 +302,12 @@ def print_score(ref_img, res_img):
     :param ref_img: reference image
     :param res_img: result image
     """
-    score = jaccard_score(ref_img.flatten(), res_img.flatten(), average='macro')
+    # score = jaccard_score(ref_img.flatten(), res_img.flatten(), average='macro')
+    ref_img_float = img_as_float(to_gray(ref_img))
+    res_img_float = img_as_float(to_gray(res_img))
+    score = ssim(ref_img_float, res_img_float, data_range=res_img_float.max() - res_img_float.min())
     print("-------------------------")
-    print("JACCARD SCORE: ", round(score, 5))
+    print("SSIM: ", round(score, 2),)
     print("-------------------------")
 
 
@@ -343,14 +352,14 @@ def _test_stabilize_two_images():
     time_duration = time.time() - curr_time
 
     # Then
-    print("~TIME DURATION: ", round(time_duration, 3), "ms")
+    print("~TIME DURATION: ", round(time_duration, 3), "s")
     print_ordered("--result--", print_values)
     print_score(img1, res)
 
 
 def main():
-    _test_stabilize_two_images()
-    # stabilize_video("images/Study_02_00007_01_L.avi")
+    # _test_stabilize_two_images()
+    stabilize_video("images/Study_02_00007_01_L.avi")
 
 
 if __name__ == '__main__':
