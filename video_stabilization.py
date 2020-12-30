@@ -53,7 +53,7 @@ def stabilize_video(f_name):
                 # perform stabilization
                 result, print_result = image_process.stabilize_picture(first_i, image2, {})
 
-                ref_image = img_as_float(image_process.to_gray(image1))
+                ref_image = img_as_float(image_process.to_gray(first_i))
                 res_image = img_as_float(image_process.to_gray(result))
 
                 print_result['score'] = ssim(ref_image,
