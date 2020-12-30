@@ -56,7 +56,10 @@ def stabilize_video(f_name):
                 ref_image = img_as_float(image_process.to_gray(image1))
                 res_image = img_as_float(image_process.to_gray(result))
 
-                print_result['score'] = ssim(ref_image, res_image, data_range=res_image.max() - res_image.min())
+                print_result['score'] = ssim(ref_image,
+                                             res_image,
+                                             data_range=res_image.max() - res_image.min(),
+                                             gaussian_weights=True)
                 print_results.append(print_result)
 
                 print("'\rRemaining frames: {0}".format(frames - cnt), end='')
