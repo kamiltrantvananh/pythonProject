@@ -1,35 +1,44 @@
 import numpy as np
 import cv2
 from matplotlib import pyplot as plt
-from vidstab import VidStab
 import collections
 import math
 from sklearn.metrics import jaccard_score
 import time
 
 
+def get_video_writer(video_name, frame_size, fps):
+    """
+    Get video writer for stabilized video.
+
+    :param video_name:  name of the stabilized video
+    :param frame_size:  frame size
+    :param fps:         frame per seconds
+    :return: video writer class from OpenCV, see <https://docs.opencv.org/master/dd/d9e/classcv_1_1VideoWriter.html>
+    """
+    fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
+    return cv2.VideoWriter(video_name, fourcc, fps, frame_size)
+
+
 def stabilize_video(f_name):
     """
     Stabilization of video sample.
 
-    :param f_name: path to the video sample file
-    :return: stabilized video
+    :param f_name:  path to the video sample file
     """
     capture = cv2.VideoCapture(f_name)
-
-    # load camera
-    frsize = (int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)), int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-    fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
+    frame_size = (int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)), int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
     fps = capture.get(cv2.CAP_PROP_FPS)
-    vid_writer = cv2.VideoWriter("stabilized.avi", fourcc, fps, frsize)
+    vid_writer = get_video_writer(f_name + "_stabilized.avi", frame_size, fps)
 
-    print("Start: ")
-    first = True
+    print("Start stabilization of video", f_name)
     cnt = 0
-    image1 = None
     print_results = []
+    first = True
     first_i = None
+    image1 = None
 
+    start_time = time.time()
     while True:
         ret, image2 = capture.read()
 
@@ -42,21 +51,26 @@ def stabilize_video(f_name):
             else:
                 # perform stabilization
                 result, print_result = stabilize_picture(first_i, image2, {})
+
                 score = jaccard_score(image1.flatten(), result.flatten(), average='macro')
                 print_result['score'] = round(score * 100, 2)
                 print_results.append(print_result)
+
                 vid_writer.write(result)
                 image1 = np.copy(result)
         else:
             break
 
-        print("frame: " + str(cnt), end='\r')
+        print("frame:", str(cnt), "duration:", round(time.time() - start_time, 3), "ms", end='\r')
         cnt += 1
 
-    print("Done")
+    print("DONE")
+    print("DURATION:", round(time.time() - start_time, 3), "ms")
+
     # print_ordered("--result--", print_results)
     av = sum(item.get('score', 0) for item in print_results) / len(print_results)
-    print("SCORE: ", round(av, 2))
+    print("JACCARD SCORE: ", round(av, 2))
+
     if capture.isOpened():
         capture.release()
 
@@ -64,29 +78,59 @@ def stabilize_video(f_name):
         vid_writer.release()
 
 
-def stabilize_picture(_img1, _img2, print_result=None):
+def stabilize_picture(image_reference, image_target, print_result=None):
     """
     Stabilization of two pictures.
 
-    :param print_result: for print results
-    :param _img1: first imgge
-    :param _img2: second image
+    :param print_result:        gathered information for stabilization process
+    :param image_reference:     reference image
+    :param image_target:        target image
     :return:
+        result_image:   stabilized target image
+        print_result:   collected information during stabilization process
     """
     if print_result is None:
         print_result = {}
-    img1, img1_gray, img1_polar = process_image(_img1)
-    img2, img2_gray, img2_polar = process_image(_img2)
 
-    (rows, cols) = img1_gray.shape
+    if image_reference.shape != image_target.shape:
+        raise NameError("Reference image and target image have different shapes!",
+                        image_reference.shape, image_target.shape)
 
-    result_image, print_result = shift_stabilization(img1_gray, img2_gray, img2, rows, cols, print_result)
-    result_image, print_result = rotation_scale_stabilization(img1_polar, img2_polar, result_image, rows, cols, print_result)
+    (rows, cols) = to_gray(image_reference).shape
+
+    result_image, print_result = shift_stabilization(
+        to_gray(image_reference),
+        to_gray(image_target),
+        image_target,
+        rows,
+        cols,
+        print_result
+    )
+
+    result_image, print_result = rotation_scale_stabilization(
+        to_log_polar(to_gray(image_reference)),
+        to_log_polar(to_gray(result_image)),
+        result_image,
+        rows,
+        cols,
+        print_result
+    )
 
     return result_image, print_result
 
 
 def rotation_scale_stabilization(img1_polar, img2_polar, img2_to_stabilized, rows, cols, print_result):
+    """
+    Perform rotation and scale stabilization using phase correlation on two log polar images.
+
+    :param img1_polar:
+    :param img2_polar:
+    :param img2_to_stabilized:
+    :param rows:
+    :param cols:
+    :param print_result:
+    :return:
+    """
     (log_polar_cx, log_polar_cy), _ = cv2.phaseCorrelate(np.float32(img1_polar), np.float32(img2_polar))
     rotation, scale = scale_rotation(log_polar_cy, rows, cols)
     print_result['scale'] = scale
@@ -99,6 +143,19 @@ def rotation_scale_stabilization(img1_polar, img2_polar, img2_to_stabilized, row
 
 
 def shift_stabilization(img1_gray, img2_gray, img2_to_stabilized, rows, cols, print_result=None):
+    """
+    Perform shift stabilization on two images using phase correlation with hanning window
+
+    :param img1_gray:           gray scale source image
+    :param img2_gray:           gray scale target image
+    :param img2_to_stabilized:  image to be stabilized
+    :param rows:                rows of result image
+    :param cols:                columns of result image
+    :param print_result:        gathered information during stabilization
+    :return:
+        result_image:   stabilized (shifted) image
+        print_result:   collected information during shift stabilization
+    """
     hanning = cv2.createHanningWindow((cols, rows), cv2.CV_32F)
     (cx, cy), _ = cv2.phaseCorrelate(np.float32(img1_gray), np.float32(img2_gray), window=hanning)
     (cx, cy) = (round(cx, 2), round(cy, 2))
@@ -114,10 +171,12 @@ def scale_rotation(cy, rows, cols):
     """
     Compute angle and scale of the point based on Cartesian coordinate system.
 
-    :param cy: base y
-    :param rows: length of the picture
-    :param cols: width of the picture
-    :return: angle and scale
+    :param cy:      base y
+    :param rows:    length of the picture
+    :param cols:    width of the picture
+    :return:
+        rotation:   difference angle in degrees
+        scale:      difference scale
     """
     rotation = -cy / rows * 360
     rotation = round(rotation, 1)
@@ -129,45 +188,72 @@ def scale_rotation(cy, rows, cols):
     return rotation, scale
 
 
-def process_image(img):
+def process_image(image):
     """
-    Apply RGB to gray scale image and transform using log polar transformation.
+    Perform image to gray scale and processed log polar transformation.
 
-    :param img: image source
-    :return: original image, gray scale image, log polar image
+    :param image: image source
+    :return:
+        image:          original image
+        image_gray:     gray scale image
+        image_polar:    log polar image
     """
 
     # gray image
-    img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     # log polar image
-    (rows, cols) = img_gray.shape
+    (rows, cols) = image_gray.shape
     center = (cols // 2, rows // 2)
     M = rows / (math.log(round(min(rows, cols) / 2)))
     flags = cv2.INTER_LINEAR | cv2.WARP_FILL_OUTLIERS
-    img_polar = cv2.logPolar(np.float32(img_gray), center, M, flags)
-    # img_polar = cv2.linearPolar(np.float32(img_gray), center, min(rows, cols), 0)
+    image_polar = cv2.logPolar(np.float32(image_gray), center, M, flags)
 
-    return img, img_gray, img_polar
+    return image, image_gray, image_polar
 
 
-def existing_solution():
+def to_log_polar(image_gray):
     """
-    Existing solution of stabilization video sample.
+    Convert gray scale image to log polar image.
 
-    :return: stabilized video
+    :param image_gray: target gray scale image
+    :return: log polar image
     """
-    stabilizer = VidStab()
-    stabilizer.stabilize(input_path='images/Study_02_00014_01_R.avi', output_path='stable_video.avi')
+    (rows, cols) = image_gray.shape
+    center = (cols // 2, rows // 2)
+    M = rows / (math.log(round(min(rows, cols) / 2)))
+    flags = cv2.INTER_LINEAR | cv2.WARP_FILL_OUTLIERS
+    return cv2.logPolar(np.float32(image_gray), center, M, flags)
 
 
-def stabilize_images(img1, img2, print_result=None):
-    res, print_result = stabilize_picture(img1, img2, print_result)
+def to_gray(image):
+    """
+    Convert image to gray scale.
 
-    # For testing purpose
-    plt.subplot(311), plt.imshow(img1)
+    :param image: target image
+    :return: gray scale image
+    """
+    return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+
+def stabilize_images(image_source, image_target, print_result=None):
+    """
+    Function for testing purpose to stabilize images using phase correlation. Also it will show result image using
+    "pyplot" library.
+
+    :param image_source: source image which will be reference
+    :param image_target: image for stabilization
+    :param print_result: gathered information about stabilization
+    :return:
+        res:            stabilized image
+        print_result:   collected information during stabilization
+    """
+    res, print_result = stabilize_picture(image_source, image_target, print_result)
+
+    # pyplot
+    plt.subplot(311), plt.imshow(image_source)
     plt.title("image 1"), plt.xticks([]), plt.yticks([])
-    plt.subplot(312), plt.imshow(img2)
+    plt.subplot(312), plt.imshow(image_target)
     plt.title("image 2"), plt.xticks([]), plt.yticks([])
     plt.subplot(313), plt.imshow(res)
     plt.title("result image"), plt.xticks([]), plt.yticks([])
@@ -176,6 +262,12 @@ def stabilize_images(img1, img2, print_result=None):
 
 
 def print_ordered(key_text, dict_values):
+    """
+    Print collected informations during stabilization process.
+
+    :param key_text:        label
+    :param dict_values:     collected information in array of dictionary or only dictionary
+    """
     print()
     print(key_text)
 
@@ -187,20 +279,37 @@ def print_ordered(key_text, dict_values):
 
 
 def _print_ordered(dict_values):
+    """
+    Sort and print content of input dictionary.
+
+    :param dict_values: collected information i n dictionary
+    """
     ordered = collections.OrderedDict(sorted(dict_values.items()))
     for k, v in ordered.items():
         print(k, v)
 
 
-def print_score(reg_img, res_img):
-    score = jaccard_score(reg_img.flatten(), res_img.flatten(), average='macro')
-    print()
-    print("SCORE: ", round(score, 5))
-    print()
+def print_score(ref_img, res_img):
+    """
+    Compute Jaccard score on two images and print a result.
+
+    :param ref_img: reference image
+    :param res_img: result image
+    """
+    score = jaccard_score(ref_img.flatten(), res_img.flatten(), average='macro')
+    print("-------------------------")
+    print("JACCARD SCORE: ", round(score, 5))
+    print("-------------------------")
 
 
-def test_shift_image(img):
-    num_rows, num_cols = img.shape[:2]
+def _test_transform_image(image_target):
+    """
+    Function for transformation of image (rotation, scale and shift) for test purpose.
+
+    :param image_target: target image to transform
+    :return: transformed image
+    """
+    num_rows, num_cols = image_target.shape[:2]
     expected_values = {
         'x': 25,
         'y': 25,
@@ -210,32 +319,38 @@ def test_shift_image(img):
     print_ordered("--expect--", expected_values)
 
     translation_matrix = np.float32([[1, 0, expected_values['x']], [0, 1, expected_values['y']]])
-    img = cv2.warpAffine(img, translation_matrix, (num_cols, num_rows))
+    image_target = cv2.warpAffine(image_target, translation_matrix, (num_cols, num_rows))
 
-    centre = tuple(np.array(img.shape[1::-1]) / 2)
+    centre = tuple(np.array(image_target.shape[1::-1]) / 2)
     rotation_matrix = cv2.getRotationMatrix2D(centre, expected_values['rotation'], expected_values['scale'])
-    img = cv2.warpAffine(img, rotation_matrix, (num_cols, num_rows))
+    image_target = cv2.warpAffine(image_target, rotation_matrix, (num_cols, num_rows))
 
-    return img
+    return image_target
 
 
-def test_stabilize_two_images():
+def _test_stabilize_two_images():
+    """
+    Test function for stabilize two images and print collected data during stabilization.
+    """
+    # Given
     img1 = cv2.imread("images/retina.jpg")
-    img2 = test_shift_image(img1)
+    img2 = _test_transform_image(img1)
     # img2 = cv2.imread("images/retina_posun.jpg")
+
+    # When
     curr_time = time.time()
     res, print_values = stabilize_images(img1, img2)
     time_duration = time.time() - curr_time
-    print("DURATION: ", round(time_duration, 3), "ms")
+
+    # Then
+    print("~TIME DURATION: ", round(time_duration, 3), "ms")
     print_ordered("--result--", print_values)
     print_score(img1, res)
 
 
 def main():
-    # test_stabilize_two_images()
-    stabilize_video("images/Study_02_00007_01_L.avi")
-
-    # existing_solution()
+    _test_stabilize_two_images()
+    # stabilize_video("images/Study_02_00007_01_L.avi")
 
 
 if __name__ == '__main__':
