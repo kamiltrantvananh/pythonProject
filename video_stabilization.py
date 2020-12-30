@@ -59,8 +59,7 @@ def stabilize_video(f_name):
                 print_result['score'] = ssim(ref_image, res_image, data_range=res_image.max() - res_image.min())
                 print_results.append(print_result)
 
-                if cnt % 10 == 0:
-                    print("Remaining frames:", frames - cnt, end='\r')
+                print("'\rRemaining frames: {0}".format(frames - cnt), end='')
 
                 vid_writer.write(result)
                 image1 = np.copy(result)
@@ -69,7 +68,8 @@ def stabilize_video(f_name):
 
         cnt += 1
 
-    print("DONE")
+    print()
+    print("Remaining frames: DONE")
     print("DURATION:", round(time.time() - start_time, 3), "s")
 
     # print_ordered("--result--", print_results)

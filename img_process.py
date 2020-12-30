@@ -30,7 +30,7 @@ class ImageProcess(object):
 
         (rows, cols) = self.to_gray(image_reference).shape
 
-        result_image, print_result = self.__shift_stabilization(
+        result_image, print_result = self.shift_stabilization(
             self.to_gray(image_reference),
             self.to_gray(image_target),
             image_target,
@@ -39,7 +39,7 @@ class ImageProcess(object):
             print_result
         )
 
-        result_image, print_result = self.__rotation_scale_stabilization(
+        result_image, print_result = self.rotation_scale_stabilization(
             self.to_log_polar(self.to_gray(image_reference)),
             self.to_log_polar(self.to_gray(result_image)),
             result_image,
@@ -51,7 +51,7 @@ class ImageProcess(object):
         return result_image, print_result
 
     @staticmethod
-    def __rotation_scale_stabilization(img1_polar, img2_polar, img2_to_stabilized, rows, cols, print_result):
+    def rotation_scale_stabilization(img1_polar, img2_polar, img2_to_stabilized, rows, cols, print_result):
         """
         Perform rotation and scale stabilization using phase correlation on two log polar images.
 
@@ -74,7 +74,7 @@ class ImageProcess(object):
         return result_image, print_result
 
     @staticmethod
-    def __shift_stabilization(img1_gray, img2_gray, img2_to_stabilized, rows, cols, print_result=None):
+    def shift_stabilization(img1_gray, img2_gray, img2_to_stabilized, rows, cols, print_result=None):
         """
         Perform shift stabilization on two images using phase correlation with hanning window
 
@@ -182,7 +182,8 @@ class ImageProcess(object):
         # score = jaccard_score(ref_img.flatten(), res_img.flatten(), average='macro')
         ref_img_float = img_as_float(ImageProcess.to_gray(ref_img))
         res_img_float = img_as_float(ImageProcess.to_gray(res_img))
-        score = ssim(ref_img_float, res_img_float, data_range=res_img_float.max() - res_img_float.min())
+        score = ssim(ref_img_float, res_img_float, data_range=res_img_float.max() - res_img_float.min(),
+                     gaussian_weights=True)
         print("-------------------------")
         print("SSIM: ", round(score, 2), )
         print("-------------------------")
