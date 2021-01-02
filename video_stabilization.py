@@ -1,9 +1,11 @@
 from img_process import ImageProcess
+import sys
 import time
 import cv2
 import numpy as np
 from skimage import img_as_float
 from skimage.metrics import structural_similarity as ssim
+import getopt
 
 
 def get_video_writer(video_name, frame_size, fps):
@@ -37,8 +39,6 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
 
     print("Start stabilization of video:", f_name)
     print("Using first frame as reference:", use_first_as_reference)
-    print("Print all stabilization results:", print_full_results)
-    print("Using Gaussian weights for SSIM score:", use_gaussian_weights)
 
     image_process = ImageProcess()
     cnt = 0
@@ -74,9 +74,12 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
                 print_result['score'] = ssim(ref_image,
                                              res_image,
                                              data_range=res_image.max() - res_image.min(),
+                                             multichannel=True,
                                              gaussian_weights=use_gaussian_weights)
+                print_result['rmse'] = image_process.rmse(ref_image, res_image)
                 print_results.append(print_result)
                 print("'\rRemaining frames: {0}".format(frames - cnt), end='')
+
         else:
             break
 
@@ -97,8 +100,26 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
         ImageProcess.print_ordered("ALL RESULTS::", print_results)
 
     av = sum(item.get('score', 0) for item in print_results) / len(print_results)
-    print("SSIM AVERAGE: ", round(av, 3))
+    print("MSSIM AVERAGE: ", round(av * 100, 2))
+    rmse = sum(item.get('rmse', 0) for item in print_results) / len(print_results)
+    print("RMSE AVERAGE: ", round(rmse * 100, 2))
+    print()
+
+
+def main(argv):
+    if len(argv) == 0:
+        raise NameError("Missing video sample file!")
+
+    opts, file_paths = getopt.getopt(argv, "f:", ["use-first-as-reference"])
+    first_as_reference = False
+    for opt, arg in opts:
+        if opt in ('-f', '--use-first-as-reference'):
+            first_as_reference = True
+
+    for file_path in file_paths:
+        stabilize_video(file_path, use_first_as_reference=first_as_reference)
 
 
 if __name__ == '__main__':
-    stabilize_video("images/Study_02_00007_01_L.avi", use_first_as_reference=True)
+    main(sys.argv[1:])
+

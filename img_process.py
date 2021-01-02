@@ -4,6 +4,7 @@ import math
 import collections
 from skimage import img_as_float
 from skimage.metrics import structural_similarity as ssim
+from sklearn.metrics import mean_squared_error
 
 
 class ImageProcess(object):
@@ -174,7 +175,7 @@ class ImageProcess(object):
     @staticmethod
     def print_score(ref_img, res_img):
         """
-        Compute Jaccard score on two images and print a result.
+        Compute SSIM score on two images and print a result.
 
         :param ref_img: reference image
         :param res_img: result image
@@ -187,3 +188,7 @@ class ImageProcess(object):
         print("-------------------------")
         print("SSIM: ", round(score, 2), )
         print("-------------------------")
+
+    @staticmethod
+    def rmse(ref_img, res_img):
+        return mean_squared_error(ref_img, res_img, squared=False)
