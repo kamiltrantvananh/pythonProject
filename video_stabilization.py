@@ -110,11 +110,14 @@ def main(argv):
     if len(argv) == 0:
         raise NameError("Missing video sample file!")
 
-    opts, file_paths = getopt.getopt(argv, "f:", ["use-first-as-reference"])
+    opts, file_paths = getopt.getopt(argv, "f", ["use-first-as-reference"])
     first_as_reference = False
     for opt, arg in opts:
         if opt in ('-f', '--use-first-as-reference'):
             first_as_reference = True
+
+    if len(file_paths) == 0:
+        raise ValueError("Missing path to video sample.")
 
     for file_path in file_paths:
         stabilize_video(file_path, use_first_as_reference=first_as_reference)
