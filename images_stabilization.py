@@ -42,7 +42,7 @@ def _test_transform_image(image_target):
     expected_values = {
         'x': 50,
         'y': 50,
-        'rotation': 45,
+        'rotation': 10,
         'scale': 1
     }
     ImageProcess.print_ordered("--expect--", expected_values)

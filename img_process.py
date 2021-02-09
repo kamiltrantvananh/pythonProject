@@ -2,7 +2,8 @@ import numpy as np
 import cv2
 import math
 import collections
-from skimage import img_as_float
+from skimage import img_as_float, img_as_ubyte
+from skimage import transform
 from skimage.metrics import structural_similarity as ssim
 from sklearn.metrics import mean_squared_error
 
@@ -96,8 +97,9 @@ class ImageProcess(object):
         print_result['x'] = cx
         print_result['y'] = cy
         flags = cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP
-        result_image = cv2.warpAffine(img2_to_stabilized, M, dsize=(cols, rows), flags=flags)
-        return result_image, print_result
+        t_form = transform.EuclideanTransform(translation=(cx, cy))
+        result_image = transform.warp(img2_to_stabilized, t_form)
+        return img_as_ubyte(result_image), print_result
 
     @staticmethod
     def __scale_rotation(cy, rows, cols):
@@ -112,7 +114,7 @@ class ImageProcess(object):
             scale:      difference scale
         """
         rotation = -cy / rows * 360
-        rotation = round(rotation, 1)
+        # rotation = round(rotation, 1)
 
         scale = math.exp(math.log(rows * 1.1 / 2.0) / max(rows, cols))
         scale = 1.0 / math.pow(scale, cy)
