@@ -40,9 +40,9 @@ def _test_transform_image(image_target):
     """
     num_rows, num_cols = image_target.shape[:2]
     expected_values = {
-        'x': 50,
-        'y': 50,
-        'rotation': 10,
+        'x': 0,
+        'y': 0,
+        'rotation': 0,
         'scale': 1
     }
     ImageProcess.print_ordered("--expect--", expected_values)

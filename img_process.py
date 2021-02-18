@@ -4,6 +4,7 @@ import math
 import collections
 from skimage import img_as_float, img_as_ubyte
 from skimage import transform
+from skimage.registration import phase_cross_correlation
 from skimage.metrics import structural_similarity as ssim
 from sklearn.metrics import mean_squared_error
 
@@ -33,8 +34,7 @@ class ImageProcess(object):
         (rows, cols) = self.to_gray(image_reference).shape
 
         result_image, print_result = self.shift_stabilization(
-            self.to_gray(image_reference),
-            self.to_gray(image_target),
+            image_reference,
             image_target,
             rows,
             cols,
@@ -42,8 +42,7 @@ class ImageProcess(object):
         )
 
         result_image, print_result = self.rotation_scale_stabilization(
-            self.to_log_polar(self.to_gray(image_reference)),
-            self.to_log_polar(self.to_gray(result_image)),
+            image_reference,
             result_image,
             rows,
             cols,
@@ -53,7 +52,7 @@ class ImageProcess(object):
         return result_image, print_result
 
     @staticmethod
-    def rotation_scale_stabilization(img1_polar, img2_polar, img2_to_stabilized, rows, cols, print_result):
+    def rotation_scale_stabilization(img1, img2, rows, cols, print_result):
         """
         Perform rotation and scale stabilization using phase correlation on two log polar images.
 
@@ -65,6 +64,10 @@ class ImageProcess(object):
         :param print_result:
         :return:
         """
+        img1_gray = ImageProcess.to_gray(img1)
+        img1_polar = ImageProcess.to_log_polar(img1_gray)
+        img2_gray = ImageProcess.to_gray(img2)
+        img2_polar = ImageProcess.to_log_polar(img2_gray)
         (log_polar_cx, log_polar_cy), _ = cv2.phaseCorrelate(np.float32(img1_polar), np.float32(img2_polar))
         rotation, scale = ImageProcess.__scale_rotation(log_polar_cy, rows, cols)
         print_result['scale'] = scale
@@ -72,17 +75,17 @@ class ImageProcess(object):
         centre = (cols // 2, rows // 2)
         transformation_matrix = cv2.getRotationMatrix2D(centre, rotation, 1)
         flags = cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP
-        result_image = cv2.warpAffine(img2_to_stabilized, transformation_matrix, dsize=(cols, rows), flags=flags)
+        result_image = cv2.warpAffine(img2, transformation_matrix, dsize=(cols, rows), flags=flags)
+
         return result_image, print_result
 
     @staticmethod
-    def shift_stabilization(img1_gray, img2_gray, img2_to_stabilized, rows, cols, print_result=None):
+    def shift_stabilization(img1, img2, rows, cols, print_result=None):
         """
         Perform shift stabilization on two images using phase correlation with hanning window
 
-        :param img1_gray:           gray scale source image
-        :param img2_gray:           gray scale target image
-        :param img2_to_stabilized:  image to be stabilized
+    :param img1                     source image
+        :param img2:                target image
         :param rows:                rows of result image
         :param cols:                columns of result image
         :param print_result:        gathered information during stabilization
@@ -90,15 +93,17 @@ class ImageProcess(object):
             result_image:   stabilized (shifted) image
             print_result:   collected information during shift stabilization
         """
+        img1_gray = ImageProcess.to_gray(img1)
+        img2_gray = ImageProcess.to_gray(img2)
+
         hanning = cv2.createHanningWindow((cols, rows), cv2.CV_32F)
         (cx, cy), _ = cv2.phaseCorrelate(np.float32(img1_gray), np.float32(img2_gray), window=hanning)
         (cx, cy) = (round(cx, 2), round(cy, 2))
         M = np.float32([[1, 0, cx], [0, 1, cy]])
         print_result['x'] = cx
         print_result['y'] = cy
-        flags = cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP
         t_form = transform.EuclideanTransform(translation=(cx, cy))
-        result_image = transform.warp(img2_to_stabilized, t_form)
+        result_image = transform.warp(img2, t_form)
         return img_as_ubyte(result_image), print_result
 
     @staticmethod
@@ -194,3 +199,16 @@ class ImageProcess(object):
     @staticmethod
     def rmse(ref_img, res_img):
         return mean_squared_error(ref_img, res_img, squared=False)
+
+    @staticmethod
+    def skimage_phase_cross_correlation(image_reference, image_target):
+        img1 = img_as_float(image_reference)
+        img2 = img_as_float(image_target)
+        polar_ref = transform.warp_polar(img1, radius=705, multichannel=True)
+        polar_tar = transform.warp_polar(img2, radius=705, multichannel=True)
+
+        shifts, error, phase_diff = phase_cross_correlation(polar_ref, polar_tar)
+        print("shifts: ", shifts)
+        print("error: ", error)
+        print("phase_diff: ", phase_diff)
+        return shifts[0], 

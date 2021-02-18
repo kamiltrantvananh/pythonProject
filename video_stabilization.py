@@ -3,9 +3,12 @@ import sys
 import time
 import cv2
 import numpy as np
-from skimage import img_as_float
 from skimage.metrics import structural_similarity as ssim
+from skimage.morphology import skeletonize
+from skimage import img_as_float, io, color, morphology
+from matplotlib import pyplot as plt
 import getopt
+from scipy import ndimage
 
 
 def get_video_writer(video_name, frame_size, fps):
@@ -41,10 +44,11 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
     print("Using first frame as reference:", use_first_as_reference)
 
     image_process = ImageProcess()
-    cnt = 0
+    r_frames = 0
     print_results = []
     first = True
     first_i, image1 = None, None
+    selected_points = dict()
 
     start_time = time.time()
     while True:
@@ -56,6 +60,35 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
                 first = False
                 image1 = np.copy(image2)
                 first_i = image1
+
+                points = []
+                cnt = 0
+
+                def select_point(event, x, y, flags, param):
+                    if event == cv2.EVENT_LBUTTONUP:
+                        cv2.circle(image2, (x, y), 5, (255, 0, 0), 1)
+                        points.append((x, y))
+                        print("clicked: ", (x, y))
+
+                cv2.namedWindow('image')
+                cv2.setMouseCallback('image', select_point)
+                while True:
+                    cv2.imshow("image", image2)
+                    k = cv2.waitKey(1) & 0xFF
+                    cnt += 1
+                    if k == 27 or k == ord('q'):
+                        break
+                    if len(points) == 5:
+                        break
+
+                print("CNT: ", cnt, " POINTS: ", points)
+                cv2.destroyAllWindows()
+
+                gray = ImageProcess.to_gray(image2)
+                for (x, y) in points:
+                    selected_points[(x, y)] = gray[y, x]
+
+                print("Values: ", selected_points)
             else:
                 # perform stabilization
                 if use_first_as_reference:
@@ -78,12 +111,12 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
                                              gaussian_weights=use_gaussian_weights)
                 print_result['rmse'] = image_process.rmse(ref_image, res_image)
                 print_results.append(print_result)
-                print("'\rRemaining frames: {0}".format(frames - cnt), end='')
+                print("'\rRemaining frames: {0}".format(frames - r_frames), end='')
 
         else:
             break
 
-        cnt += 1
+        r_frames += 1
 
     if capture.isOpened():
         capture.release()
