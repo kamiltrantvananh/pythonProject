@@ -48,7 +48,8 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
     print_results = []
     first = True
     first_i, image1 = None, None
-    selected_points = dict()
+
+    points = []
 
     start_time = time.time()
     while True:
@@ -60,35 +61,7 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
                 first = False
                 image1 = np.copy(image2)
                 first_i = image1
-
-                points = []
-                cnt = 0
-
-                def select_point(event, x, y, flags, param):
-                    if event == cv2.EVENT_LBUTTONUP:
-                        cv2.circle(image2, (x, y), 5, (255, 0, 0), 1)
-                        points.append((x, y))
-                        print("clicked: ", (x, y))
-
-                cv2.namedWindow('image')
-                cv2.setMouseCallback('image', select_point)
-                while True:
-                    cv2.imshow("image", image2)
-                    k = cv2.waitKey(1) & 0xFF
-                    cnt += 1
-                    if k == 27 or k == ord('q'):
-                        break
-                    if len(points) == 5:
-                        break
-
-                print("CNT: ", cnt, " POINTS: ", points)
-                cv2.destroyAllWindows()
-
-                gray = ImageProcess.to_gray(image2)
-                for (x, y) in points:
-                    selected_points[(x, y)] = gray[y, x]
-
-                print("Values: ", selected_points)
+                points.append(image_process.select_reference_points(image2))
             else:
                 # perform stabilization
                 if use_first_as_reference:
@@ -97,6 +70,9 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
                 else:
                     result, print_result = image_process.stabilize_picture(image1, image2)
                     ref_image = img_as_float(image_process.to_gray(image1))
+
+                if r_frames % 10 == 0:
+                    image_process.tracking_points(points[0], result)
 
                 # write stabilized frame
                 vid_writer.write(result)
@@ -111,8 +87,7 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
                                              gaussian_weights=use_gaussian_weights)
                 print_result['rmse'] = image_process.rmse(ref_image, res_image)
                 print_results.append(print_result)
-                print("'\rRemaining frames: {0}".format(frames - r_frames), end='')
-
+                print("'\rRemaining frames: {0}. Actual frame: {1}".format(frames - r_frames, r_frames), end='')
         else:
             break
 
@@ -128,6 +103,8 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
     print("Result stabilized video:", stabilized_video_name)
     print("-STATS--------------")
     print("DURATION:", round(time.time() - start_time, 3), "s")
+
+    print("Selected points: ", points)
 
     if print_full_results:
         ImageProcess.print_ordered("ALL RESULTS::", print_results)

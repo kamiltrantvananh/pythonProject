@@ -4,7 +4,6 @@ import math
 import collections
 from skimage import img_as_float, img_as_ubyte
 from skimage import transform
-from skimage.registration import phase_cross_correlation
 from skimage.metrics import structural_similarity as ssim
 from sklearn.metrics import mean_squared_error
 
@@ -13,6 +12,7 @@ class ImageProcess(object):
     """
     This class provides methods for stabilize 2 images by using phase correlation
     """
+
     def stabilize_picture(self, image_reference, image_target, print_result=None):
         """
         Stabilization of two pictures.
@@ -201,14 +201,68 @@ class ImageProcess(object):
         return mean_squared_error(ref_img, res_img, squared=False)
 
     @staticmethod
-    def skimage_phase_cross_correlation(image_reference, image_target):
-        img1 = img_as_float(image_reference)
-        img2 = img_as_float(image_target)
-        polar_ref = transform.warp_polar(img1, radius=705, multichannel=True)
-        polar_tar = transform.warp_polar(img2, radius=705, multichannel=True)
+    def select_reference_points(image):
+        points = []
+        alpha = 50
+        beta = 1.5
 
-        shifts, error, phase_diff = phase_cross_correlation(polar_ref, polar_tar)
-        print("shifts: ", shifts)
-        print("error: ", error)
-        print("phase_diff: ", phase_diff)
-        return shifts[0], 
+        new_image = cv2.convertScaleAbs(image, alpha, beta)
+
+        def select_point(event, x, y, flags, param):
+            if event == cv2.EVENT_LBUTTONUP:
+                cv2.circle(new_image, (x, y), 5, (255, 0, 0), 1)
+                points.append((x, y))
+                cv2.putText(new_image, str(len(points)), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 4, cv2.LINE_AA)
+                print(str(len(points)), ". point: ", (x, y))
+
+        cv2.namedWindow('image')
+        cv2.setMouseCallback('image', select_point)
+        while True:
+            cv2.imshow("image", new_image)
+            k = cv2.waitKey(1) & 0xFF
+            if k == 27 or k == ord('q'):
+                break
+            if len(points) == 5:
+                break
+        cv2.destroyAllWindows()
+
+        gray = img_as_float(ImageProcess.to_gray(image))
+        selected_points = {}
+        for (x, y) in points:
+            selected_points[(x, y)] = gray[y, x]
+
+        print("Selected points:\t", selected_points)
+        return selected_points
+
+    @staticmethod
+    def tracking_points(selected_points, image):
+        tracked_points = {}
+        image = img_as_float(ImageProcess.to_gray(image))
+        limit = 50
+        cnt = 1
+        for (x, y), value in selected_points.items():
+            tracked_points = ImageProcess.find_points(image, x, y, value, tracked_points)
+            cnt += 1
+
+        print("Tracked points:\t\t", tracked_points)
+        return tracked_points
+
+    @staticmethod
+    def find_points(image, x, y, value, tracked_points):
+        (rows, cols) = image.shape
+        for y_col in range(-5, 6):
+            tmp_y = y_col + y
+            if cols <= tmp_y < 0:
+                continue
+            for x_row in range(-5, 6):
+                tmp_x = x_row + x
+                if rows <= tmp_x < 0:
+                    continue
+
+                similar = abs(image[tmp_y, tmp_x] - value)
+                if similar < 0.0001:
+                    tracked_points[(tmp_x, tmp_y)] = image[tmp_y, tmp_x]
+                    return tracked_points
+
+        tracked_points[(-1, -1)] = float('nan')
+        return tracked_points
