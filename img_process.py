@@ -6,6 +6,7 @@ from skimage import img_as_float, img_as_ubyte
 from skimage import transform
 from skimage.metrics import structural_similarity as ssim
 from sklearn.metrics import mean_squared_error
+from scipy.spatial import distance
 
 
 class ImageProcess(object):
@@ -236,33 +237,37 @@ class ImageProcess(object):
 
     @staticmethod
     def tracking_points(selected_points, image):
-        tracked_points = {}
+        tracked_points = []
         image = img_as_float(ImageProcess.to_gray(image))
-        limit = 50
-        cnt = 1
         for (x, y), value in selected_points.items():
-            tracked_points = ImageProcess.find_points(image, x, y, value, tracked_points)
-            cnt += 1
+            t_x, t_y = ImageProcess.find_point(image, x, y, value)
+            tracked_points.append((t_x, t_y))
 
-        print("Tracked points:\t\t", tracked_points)
+        # print("Tracked points:\t\t", tracked_points)
         return tracked_points
 
     @staticmethod
-    def find_points(image, x, y, value, tracked_points):
+    def find_point(image, x, y, value):
         (rows, cols) = image.shape
-        for y_col in range(-5, 6):
+        neighbour = 15
+        threshold = 0.0001
+        for y_col in range(neighbour * -1, neighbour):
             tmp_y = y_col + y
             if cols <= tmp_y < 0:
                 continue
-            for x_row in range(-5, 6):
+            for x_row in range(neighbour * -1, neighbour):
                 tmp_x = x_row + x
                 if rows <= tmp_x < 0:
                     continue
 
                 similar = abs(image[tmp_y, tmp_x] - value)
-                if similar < 0.0001:
-                    tracked_points[(tmp_x, tmp_y)] = image[tmp_y, tmp_x]
-                    return tracked_points
+                if similar < threshold:
+                    return tmp_x, tmp_y
 
-        tracked_points[(-1, -1)] = float('nan')
-        return tracked_points
+        print("not found for: ", (x, y))
+        return -1, -1
+
+    @staticmethod
+    def euclid_distance(selected_points, tracked_points):
+        print("Euclid distance: ", distance.cdist(np.array(list(selected_points.keys())), tracked_points))
+

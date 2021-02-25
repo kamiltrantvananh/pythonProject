@@ -49,7 +49,7 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
     first = True
     first_i, image1 = None, None
 
-    points = []
+    selected_points = {}
 
     start_time = time.time()
     while True:
@@ -61,7 +61,7 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
                 first = False
                 image1 = np.copy(image2)
                 first_i = image1
-                points.append(image_process.select_reference_points(image2))
+                selected_points = image_process.select_reference_points(image2)
             else:
                 # perform stabilization
                 if use_first_as_reference:
@@ -72,7 +72,8 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
                     ref_image = img_as_float(image_process.to_gray(image1))
 
                 if r_frames % 10 == 0:
-                    image_process.tracking_points(points[0], result)
+                    tracking_points = image_process.tracking_points(selected_points, result)
+                    image_process.euclid_distance(selected_points, tracking_points)
 
                 # write stabilized frame
                 vid_writer.write(result)
@@ -105,6 +106,7 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
     print("DURATION:", round(time.time() - start_time, 3), "s")
 
     print("Selected points: ", points)
+    image_process.euclid_distance()
 
     if print_full_results:
         ImageProcess.print_ordered("ALL RESULTS::", print_results)
