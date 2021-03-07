@@ -50,6 +50,7 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
     first_i, image1 = None, None
 
     selected_points = {}
+    euclid_distances = []
 
     start_time = time.time()
     while True:
@@ -73,7 +74,7 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
 
                 if r_frames % 10 == 0:
                     tracking_points = image_process.tracking_points(selected_points, result)
-                    image_process.euclid_distance(selected_points, tracking_points)
+                    euclid_distances.append(image_process.euclid_distance(selected_points, tracking_points))
 
                 # write stabilized frame
                 vid_writer.write(result)
@@ -105,8 +106,7 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
     print("-STATS--------------")
     print("DURATION:", round(time.time() - start_time, 3), "s")
 
-    print("Selected points: ", points)
-    image_process.euclid_distance()
+    print("EUCLID DISTANCES: ", euclid_distances)
 
     if print_full_results:
         ImageProcess.print_ordered("ALL RESULTS::", print_results)
