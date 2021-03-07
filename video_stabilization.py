@@ -107,6 +107,8 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
     print("DURATION:", round(time.time() - start_time, 3), "s")
 
     print("EUCLID DISTANCES: ", euclid_distances)
+    euclid_average = np.array(euclid_distances).mean(axis=0)
+    print("EUCLID DISTANCES AVERAGE: ", euclid_average)
 
     if print_full_results:
         ImageProcess.print_ordered("ALL RESULTS::", print_results)
