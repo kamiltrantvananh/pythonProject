@@ -1,14 +1,14 @@
-from img_process import ImageProcess
+import getopt
 import sys
 import time
+import openpyxl
+from pandas import *
 import cv2
 import numpy as np
+from skimage import img_as_float
 from skimage.metrics import structural_similarity as ssim
-from skimage.morphology import skeletonize
-from skimage import img_as_float, io, color, morphology
-from matplotlib import pyplot as plt
-import getopt
-from scipy import ndimage
+
+from img_process import ImageProcess
 
 
 def get_video_writer(video_name, frame_size, fps):
@@ -24,7 +24,8 @@ def get_video_writer(video_name, frame_size, fps):
     return cv2.VideoWriter(video_name, fourcc, fps, frame_size)
 
 
-def stabilize_video(f_name, use_first_as_reference=False, print_full_results=False, use_gaussian_weights=True):
+def stabilize_video(f_name, use_first_as_reference=False, print_full_results=False, use_gaussian_weights=True,
+                    selected_points=None):
     """
     Stabilization of video sample.
 
@@ -32,7 +33,10 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
     :param use_first_as_reference:  use first frame as a reference image, default is False
     :param print_full_results:      if you want print all results from stabilization
     :param use_gaussian_weights:    use gaussian weights in SSIM calculation
+    :param selected_points:         selected 5 points
     """
+    if selected_points is None:
+        selected_points = {}
     capture = cv2.VideoCapture(f_name)
     frames = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
     frame_size = (int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)), int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
@@ -49,7 +53,6 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
     first = True
     first_i, image1 = None, None
 
-    selected_points = {}
     euclid_distances = []
 
     start_time = time.time()
@@ -62,7 +65,8 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
                 first = False
                 image1 = np.copy(image2)
                 first_i = image1
-                selected_points = image_process.select_reference_points(image2)
+                if not selected_points:
+                    selected_points = image_process.select_reference_points(image2)
             else:
                 # perform stabilization
                 if use_first_as_reference:
@@ -75,6 +79,7 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
                 if r_frames % 10 == 0:
                     tracking_points = image_process.tracking_points(selected_points, result)
                     euclid_distances.append(image_process.euclid_distance(selected_points, tracking_points))
+                    break
 
                 # write stabilized frame
                 vid_writer.write(result)
@@ -124,17 +129,24 @@ def main(argv):
     if len(argv) == 0:
         raise NameError("Missing video sample file!")
 
-    opts, file_paths = getopt.getopt(argv, "f", ["use-first-as-reference"])
+    opts, file_paths = getopt.getopt(argv, "fs:", ["use-first-as-reference", "selected-points"])
     first_as_reference = False
+    selected_points = {}
     for opt, arg in opts:
         if opt in ('-f', '--use-first-as-reference'):
             first_as_reference = True
+        if opt in ('-s', '--selected-points'):
+            excel = pandas.read_excel(arg, index_col=0).to_dict()["value"]
+            for k in excel:
+                x, y = tuple(map(int, k.split(',')))
+                selected_points[(x, y)] = excel[k]
 
     if len(file_paths) == 0:
         raise ValueError("Missing path to video sample.")
 
+    print(selected_points)
     for file_path in file_paths:
-        stabilize_video(file_path, use_first_as_reference=first_as_reference)
+        stabilize_video(file_path, use_first_as_reference=first_as_reference, selected_points=selected_points)
 
 
 if __name__ == '__main__':
