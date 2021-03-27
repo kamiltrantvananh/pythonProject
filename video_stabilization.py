@@ -79,7 +79,6 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
                 if r_frames % 10 == 0:
                     tracking_points = image_process.tracking_points(selected_points, result)
                     euclid_distances.append(image_process.euclid_distance(selected_points, tracking_points))
-                    break
 
                 # write stabilized frame
                 vid_writer.write(result)
