@@ -111,7 +111,7 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
     print("DURATION:", round(time.time() - start_time, 3), "s")
 
     print("EUCLID DISTANCES: ", euclid_distances)
-    euclid_average = np.array(euclid_distances).mean(axis=0)
+    euclid_average = mean_euclid_distances(euclid_distances)
     print("EUCLID DISTANCES AVERAGE: ", euclid_average)
 
     if print_full_results:
@@ -122,6 +122,20 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
     rmse = sum(item.get('rmse', 0) for item in print_results) / len(print_results)
     print("RMSE AVERAGE: ", round(rmse * 100, 2))
     print()
+
+
+def mean_euclid_distances(euclid_distances):
+    averages = []
+    for i in range(len(euclid_distances[0])):
+        tmp = 0
+        cnt = 0
+        for euclid_distance in [elem[i] for elem in euclid_distances]:
+            if euclid_distance != -1:
+                tmp += euclid_distance
+                cnt += 1
+        averages.append(tmp/cnt) if cnt != 0 else tmp
+
+    return sum(averages) / len(averages)
 
 
 def main(argv):

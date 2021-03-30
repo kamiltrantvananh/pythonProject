@@ -269,16 +269,9 @@ class ImageProcess(object):
 
     @staticmethod
     def euclid_distance(selected_points, tracked_points):
-        selected = np.array(list(selected_points.keys()))
-        new_selected_points = []
-        new_tracked_points = []
-        for k in range(0, len(tracked_points)):
-            if tracked_points[k] != (-1, -1):
-                new_tracked_points.append(tracked_points[k])
-                new_selected_points.append(selected[:][k])
-        dist = distance.cdist(np.array(new_selected_points), np.array(new_tracked_points))
+        dist = distance.cdist(np.array(list(selected_points.keys())), tracked_points)
         res = []
-        for i in range(0, len(new_selected_points)):
+        for i in range(0, len(selected_points)):
             res.append(dist[i][i])
         # print("Euclid distance: ", res)
         return res
