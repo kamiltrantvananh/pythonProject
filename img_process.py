@@ -74,7 +74,7 @@ class ImageProcess(object):
         print_result['scale'] = scale
         print_result['rotation'] = rotation
         centre = (cols // 2, rows // 2)
-        transformation_matrix = cv2.getRotationMatrix2D(centre, rotation, 1)
+        transformation_matrix = cv2.getRotationMatrix2D(centre, rotation, scale)
         flags = cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP
         result_image = cv2.warpAffine(img2, transformation_matrix, dsize=(cols, rows), flags=flags)
 
@@ -122,11 +122,28 @@ class ImageProcess(object):
         rotation = -cy / rows * 360
         # rotation = round(rotation, 1)
 
-        scale = math.exp(math.log(rows * 1.1 / 2.0) / max(rows, cols))
-        scale = 1.0 / math.pow(scale, cy)
-        scale = round(scale)
+        # scale = math.exp(math.log(rows * 1.1 / 2.0) / max(rows, cols))
+        # scale = 1.0 / math.pow(scale, cy)
+        pcorr_shape = ImageProcess.__get_pcorr_shape((rows, cols))
+        log_base = ImageProcess.__get_log_base((rows, cols), pcorr_shape[1])
+        scale = log_base ** cy
+        scale = 1.0 / scale
 
         return rotation, scale
+
+    @staticmethod
+    def __get_log_base(shape, new_r):
+        old_r = shape[0] * 1.1
+        # We are radius, so we divide the diameter by two.
+        old_r /= 2.0
+        # we have at most 'new_r' of space.
+        log_base = np.exp(np.log(old_r) / new_r)
+        return log_base
+
+    @staticmethod
+    def __get_pcorr_shape(shape):
+        ret = (int(max(shape) * 1.0),) * 2
+        return ret
 
     @staticmethod
     def to_log_polar(image_gray):

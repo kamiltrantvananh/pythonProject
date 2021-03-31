@@ -43,7 +43,7 @@ def _test_transform_image(image_target):
         'x': 0,
         'y': 0,
         'rotation': 5,
-        'scale': 1
+        'scale': 1.1
     }
     ImageProcess.print_ordered("--expect--", expected_values)
 
