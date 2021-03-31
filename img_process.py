@@ -269,10 +269,10 @@ class ImageProcess(object):
 
     @staticmethod
     def euclid_distance(selected_points, tracked_points):
-        dist = distance.cdist(np.array(list(selected_points.keys())), tracked_points)
-        res = []
-        for i in range(0, len(selected_points)):
-            res.append(dist[i][i])
-        # print("Euclid distance: ", res)
-        return res
-
+        r = []
+        for index in range(len(selected_points)):
+            if tracked_points[index] != (-1, -1):
+                r.append(distance.euclidean(list(selected_points.keys())[index], tracked_points[index]))
+            else:
+                r.append(-1)
+        return r

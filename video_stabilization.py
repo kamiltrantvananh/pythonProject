@@ -135,7 +135,7 @@ def mean_euclid_distances(euclid_distances):
                 cnt += 1
         averages.append(tmp/cnt) if cnt != 0 else tmp
 
-    return sum(averages) / len(averages)
+    return averages
 
 
 def main(argv):
