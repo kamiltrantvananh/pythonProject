@@ -39,7 +39,7 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
         selected_points = {}
     capture = cv2.VideoCapture(f_name)
     frames = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
-    frame_size = (int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)), int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+    frame_size = (int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)), int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))-65)
     fps = capture.get(cv2.CAP_PROP_FPS)
     stabilized_video_name = f_name + "_stabilized.avi"
     vid_writer = get_video_writer(stabilized_video_name, frame_size, fps)
@@ -61,6 +61,8 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
 
         if ret:
             # read the camera image:
+            rows, cols, _ = image2.shape
+            image2 = image2[65:rows, 0:cols]
             if first:
                 first = False
                 image1 = np.copy(image2)

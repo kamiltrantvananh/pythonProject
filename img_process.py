@@ -3,10 +3,11 @@ import cv2
 import math
 import collections
 from skimage import img_as_float, img_as_ubyte
-from skimage import transform
+from skimage import transform, filters
 from skimage.metrics import structural_similarity as ssim
 from sklearn.metrics import mean_squared_error
 from scipy.spatial import distance
+from scipy.fftpack import fft2, fftshift
 
 
 class ImageProcess(object):
@@ -69,13 +70,13 @@ class ImageProcess(object):
         img1_polar = ImageProcess.to_log_polar(img1_gray)
         img2_gray = ImageProcess.to_gray(img2)
         img2_polar = ImageProcess.to_log_polar(img2_gray)
-        (log_polar_cx, log_polar_cy), _ = cv2.phaseCorrelate(np.float32(img1_polar), np.float32(img2_polar))
-        rotation, scale = ImageProcess.__scale_rotation(log_polar_cy, rows, cols)
+        (log_polar_cx, log_polar_cy), _ = cv2.phaseCorrelate(np.float32(img2_polar), np.float32(img1_polar))
+        rotation, scale = ImageProcess.__scale_rotation(log_polar_cy, log_polar_cx, rows, cols)
         print_result['scale'] = scale
         print_result['rotation'] = rotation
         centre = (cols // 2, rows // 2)
         transformation_matrix = cv2.getRotationMatrix2D(centre, rotation, scale)
-        flags = cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP
+        flags = cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP
         result_image = cv2.warpAffine(img2, transformation_matrix, dsize=(cols, rows), flags=flags)
 
         return result_image, print_result
@@ -98,8 +99,8 @@ class ImageProcess(object):
         img2_gray = ImageProcess.to_gray(img2)
 
         hanning = cv2.createHanningWindow((cols, rows), cv2.CV_32F)
-        (cx, cy), _ = cv2.phaseCorrelate(np.float32(img1_gray), np.float32(img2_gray), window=hanning)
-        (cx, cy) = (round(cx, 2), round(cy, 2))
+        (cx, cy), _ = cv2.phaseCorrelate(np.float32(img2_gray), np.float32(img1_gray))
+        # (cx, cy) = (round(cx, 2), round(cy, 2))
         M = np.float32([[1, 0, cx], [0, 1, cy]])
         print_result['x'] = cx
         print_result['y'] = cy
@@ -108,7 +109,7 @@ class ImageProcess(object):
         return img_as_ubyte(result_image), print_result
 
     @staticmethod
-    def __scale_rotation(cy, rows, cols):
+    def __scale_rotation(cy, cx, rows, cols):
         """
         Compute angle and scale of the point based on Cartesian coordinate system.
 
@@ -119,15 +120,14 @@ class ImageProcess(object):
             rotation:   difference angle in degrees
             scale:      difference scale
         """
-        rotation = -cy / rows * 360
+        rotation = cy / rows * 360
         # rotation = round(rotation, 1)
 
         # scale = math.exp(math.log(rows * 1.1 / 2.0) / max(rows, cols))
         # scale = 1.0 / math.pow(scale, cy)
         pcorr_shape = ImageProcess.__get_pcorr_shape((rows, cols))
         log_base = ImageProcess.__get_log_base((rows, cols), pcorr_shape[1])
-        scale = log_base ** cy
-        scale = 1.0 / scale
+        scale = 1.0 / pow(log_base, cx)
 
         return rotation, scale
 
@@ -167,7 +167,8 @@ class ImageProcess(object):
         :param image: target image
         :return: gray scale image
         """
-        return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).astype("float32")
 
     @staticmethod
     def print_ordered(key_text, dict_values):

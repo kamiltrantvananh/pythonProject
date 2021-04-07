@@ -42,8 +42,8 @@ def _test_transform_image(image_target):
     expected_values = {
         'x': 0,
         'y': 0,
-        'rotation': 5,
-        'scale': 1.1
+        'rotation': 24,
+        'scale': 0.99
     }
     ImageProcess.print_ordered("--expect--", expected_values)
 
@@ -65,14 +65,14 @@ def _test_stabilize_two_images():
     img = cv2.imread("images/retina.jpg")
     img2 = _test_transform_image(img)
 
-    selected_points = ImageProcess.select_reference_points(img)
+    # selected_points = ImageProcess.select_reference_points(img)
 
     # When
     curr_time = time.time()
     res, print_values = stabilize_images(img, img2)
     time_duration = time.time() - curr_time
 
-    ImageProcess.tracking_points(selected_points, res)
+    # ImageProcess.tracking_points(selected_points, res)
 
     # Then
     print("~TIME DURATION: ", round(time_duration, 3), "s")
