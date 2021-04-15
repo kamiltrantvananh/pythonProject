@@ -14,7 +14,7 @@ class ImageProcess(object):
     This class provides methods for stabilize 2 images by using phase correlation
     """
 
-    def stabilize_picture(self, image_reference, image_target, print_result=None):
+    def stabilize_picture(self, image_reference, image_target, print_result=None, crop_sizes=(0, 0)):
         """
         Stabilization of two pictures.
 
@@ -37,23 +37,21 @@ class ImageProcess(object):
         result_image, print_result = self.shift_stabilization(
             image_reference,
             image_target,
-            rows,
-            cols,
-            print_result
+            print_result,
+            crop_sizes
         )
 
         result_image, print_result = self.rotation_scale_stabilization(
             image_reference,
             result_image,
-            rows,
-            cols,
-            print_result
+            print_result,
+            crop_sizes
         )
 
         return result_image, print_result
 
     @staticmethod
-    def rotation_scale_stabilization(img1, img2, rows, cols, print_result):
+    def rotation_scale_stabilization(img1, img2, print_result, crop_sizes):
         """
         Perform rotation and scale stabilization using phase correlation on two log polar images.
 
@@ -67,16 +65,18 @@ class ImageProcess(object):
         """
         radius = 420
 
-        img1_gray = ImageProcess.to_gray(img1)
+        img1_gray = ImageProcess.crop_image(ImageProcess.to_gray(img1), crop_sizes)
         m1 = np.abs(fft2(img1_gray))
         img1_polar = ImageProcess.to_log_polar(m1)
         shape = img1_gray.shape
         img1_polar = img1_polar[:shape[0] // 2, :]
 
-        img2_gray = ImageProcess.to_gray(img2)
+        img2_gray = ImageProcess.crop_image(ImageProcess.to_gray(img2), crop_sizes)
         m2 = np.abs(fft2(img2_gray))
         img2_polar = ImageProcess.to_log_polar(m2)
         img2_polar = img2_polar[:shape[0] // 2, :]
+
+        (rows, cols) = img1_gray.shape
 
         (log_polar_cx, log_polar_cy), _ = cv2.phaseCorrelate(np.float32(img1_polar), np.float32(img2_polar))
         rotation, scale = ImageProcess.__scale_rotation(log_polar_cy, rows, cols)
@@ -86,12 +86,13 @@ class ImageProcess(object):
         centre = (cols // 2, rows // 2)
         transformation_matrix = cv2.getRotationMatrix2D(centre, rotation, 1)
         flags = cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP | cv2.BORDER_REPLICATE
-        result_image = cv2.warpAffine(img2, transformation_matrix, dsize=(cols, rows), flags=flags)
+        (img2_y, img2_x, _) = img2.shape
+        result_image = cv2.warpAffine(img2, transformation_matrix, dsize=(img2_x, img2_y), flags=flags)
 
         return result_image, print_result
 
     @staticmethod
-    def shift_stabilization(img1, img2, rows, cols, print_result=None):
+    def shift_stabilization(img1, img2, print_result, crop_sizes):
         """
         Perform shift stabilization on two images using phase correlation with hanning window
 
@@ -104,8 +105,10 @@ class ImageProcess(object):
             result_image:   stabilized (shifted) image
             print_result:   collected information during shift stabilization
         """
-        img1_gray = ImageProcess.to_gray(img1)
-        img2_gray = ImageProcess.to_gray(img2)
+        img1_gray = ImageProcess.crop_image(ImageProcess.to_gray(img1), crop_sizes)
+        img2_gray = ImageProcess.crop_image(ImageProcess.to_gray(img2), crop_sizes)
+
+        (rows, cols) = img1_gray.shape
 
         hanning = cv2.createHanningWindow((cols, rows), cv2.CV_32F)
 
@@ -169,6 +172,13 @@ class ImageProcess(object):
         M = rows / (math.log(round(min(rows, cols) / 2)))
         flags = cv2.INTER_LINEAR | cv2.WARP_FILL_OUTLIERS
         return cv2.logPolar(np.float32(image_gray), center, M, flags)
+
+    @staticmethod
+    def crop_image(image, crop_sizes=(0, 0)):
+        crop_x = int(crop_sizes[0] / 2)
+        crop_y = int(crop_sizes[1] / 2)
+        (x, y) = image.shape
+        return image[crop_x:x - crop_x, crop_y:y - crop_y]
 
     @staticmethod
     def to_gray(image):

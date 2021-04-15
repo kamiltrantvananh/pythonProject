@@ -39,8 +39,11 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
         selected_points = {}
     capture = cv2.VideoCapture(f_name)
 
+    CROP_X = 258
+    CROP_Y = 488
+
     frames = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
-    frame_size = (int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))-50, int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))-50)
+    frame_size = (int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)), int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
 
     fps = capture.get(cv2.CAP_PROP_FPS)
     stabilized_video_name = f_name + "_stabilized.avi"
@@ -65,7 +68,6 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
         if ret:
             # read the camera image:
             rows, cols, _ = image2.shape
-            image2 = image2[50:rows, 50:cols]
             if first:
                 first = False
                 image1 = np.copy(image2)
@@ -75,7 +77,7 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
             else:
                 # perform stabilization
                 if use_first_as_reference:
-                    result, print_result = image_process.stabilize_picture(first_i, image2)
+                    result, print_result = image_process.stabilize_picture(first_i, image2, crop_sizes=(CROP_X, CROP_Y))
                     ref_image = img_as_float(image_process.to_gray(first_i))
                 else:
                     result, print_result = image_process.stabilize_picture(image1, image2)
@@ -90,13 +92,6 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
                 image1 = np.copy(result)
 
                 # statistics
-                res_image = img_as_float(image_process.to_gray(result))
-                print_result['score'] = ssim(ref_image,
-                                             res_image,
-                                             data_range=res_image.max() - res_image.min(),
-                                             multichannel=True,
-                                             gaussian_weights=use_gaussian_weights)
-                print_result['std'] = np.std(euclid_distances)
                 print_results.append(print_result)
                 print("'\rRemaining frames: {0}. Actual frame: {1}".format(frames - r_frames, r_frames), end='')
         else:
@@ -122,9 +117,8 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
     if print_full_results:
         image_process.print_ordered("ALL RESULTS::", print_results)
 
-    av = sum(item.get('score', 0) for item in print_results) / len(print_results)
-    print("MSSIM AVERAGE: ", round(av * 100, 2))
     print("STD: ", std_euclids(euclid_distances, euclid_average))
+    boxplot_euclids(euclid_distances)
     print()
 
 
@@ -132,7 +126,7 @@ def boxplot_euclids(euclid_distances):
     euclids = get_euclid_distance_per_point(euclid_distances)
     plt.boxplot(euclids)
     plt.show()
-    plt.savefig()
+    plt.savefig('Euclid distances.png')
 
 
 def get_euclid_distance_per_point(euclid_distances):
