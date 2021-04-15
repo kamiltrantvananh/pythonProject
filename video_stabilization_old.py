@@ -1,12 +1,12 @@
 import getopt
 import sys
 import time
-import openpyxl
 from pandas import *
 import cv2
 import numpy as np
 from skimage import img_as_float
 from skimage.metrics import structural_similarity as ssim
+from matplotlib import pyplot as plt
 
 from img_process_old import ImageProcess
 
@@ -124,9 +124,27 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
 
     av = sum(item.get('score', 0) for item in print_results) / len(print_results)
     print("MSSIM AVERAGE: ", round(av * 100, 2))
-    std = sum(item.get('std', 0) for item in print_results) / len(print_results)
-    print("STD: ", round(std, 2))
+    print("STD: ", std_euclids(euclid_distances, euclid_average))
     print()
+
+
+def boxplot_euclids(euclid_distances):
+    euclids = get_euclid_distance_per_point(euclid_distances)
+    plt.boxplot(euclids)
+    plt.show()
+    plt.savefig()
+
+
+def get_euclid_distance_per_point(euclid_distances):
+    euclids = []
+    for i in range(len(euclid_distances[0])):
+        euclid = []
+        for euclid_distance in [elem[i] for elem in euclid_distances]:
+            if euclid_distance != -1:
+                euclid.append(euclid_distance)
+        euclids.append(euclid)
+
+    return euclids
 
 
 def mean_euclid_distances(euclid_distances):
@@ -141,6 +159,20 @@ def mean_euclid_distances(euclid_distances):
         averages.append(tmp/cnt) if cnt != 0 else tmp
 
     return averages
+
+
+def std_euclids(euclid_distances, mean):
+    var = []
+    for i in range(len(euclid_distances[0])):
+        tmp = 0
+        cnt = 0
+        for euclid_distance in [elem[i] for elem in euclid_distances]:
+            if euclid_distance != -1:
+                tmp += (euclid_distance - mean)**2
+                cnt += 1
+        var.append(tmp/cnt) if cnt != 0 else tmp
+
+    return np.sqrt(var)
 
 
 def main(argv):
