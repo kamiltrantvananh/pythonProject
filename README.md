@@ -1,7 +1,7 @@
 Registrace obrazových sekvencí z experimentálního videooftalmoskopu
 ==============
 
-- semestrálna práca je zložená z dvoch súborov implementovaných v prostredí Python 3.8:
+- diplomová práca je zložená z dvoch súborov implementovaných v prostredí Python 3.8:
     - video_stabilization.py - registračný algoritmus pre obrazové sekvencie
     - images_stabilization.py - registračný algoritmus pre 2 snímky
     - img_process.py - knižnica s algoritmom 
