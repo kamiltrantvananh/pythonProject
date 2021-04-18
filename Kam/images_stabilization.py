@@ -42,8 +42,8 @@ def _test_transform_image(image_target):
     expected_values = {
         'x': 0,
         'y': 0,
-        'rotation': 24,
-        'scale': 0.99
+        'rotation': 0,
+        'scale': 1
     }
     ImageProcess.print_ordered("--expect--", expected_values)
 
@@ -65,14 +65,35 @@ def _test_stabilize_two_images():
     img = cv2.imread("images/retina.jpg")
     img2 = _test_transform_image(img)
 
-    # selected_points = ImageProcess.select_reference_points(img)
+    selected_points = ImageProcess.select_reference_points(img)
 
     # When
     curr_time = time.time()
     res, print_values = stabilize_images(img, img2)
     time_duration = time.time() - curr_time
 
-    # ImageProcess.tracking_points(selected_points, res)
+    tracking_points = ImageProcess.tracking_points(selected_points, res)
+
+    ax1 = plt.subplot(1,2,1)
+    ax2 = plt.subplot(1,2,2)
+
+    ax1.imshow(img)
+    ax1.set_title("img")
+    ax1.set_axis_off()
+    for key in selected_points.keys():
+        rect = plt.Rectangle(key, 50, 50, edgecolor='r', facecolor='none')
+        ax1.add_patch(rect)
+
+    ax2.imshow(res)
+    ax2.set_title("res")
+    ax2.set_axis_off()
+    for key in tracking_points:
+        rect = plt.Rectangle(key, 50, 50, edgecolor='r', facecolor='none')
+        ax2.add_patch(rect)
+    plt.show()
+
+    print("S: " + str(selected_points.keys()))
+    print("T: " + str(tracking_points))
 
     # Then
     print("~TIME DURATION: ", round(time_duration, 3), "s")

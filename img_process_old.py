@@ -5,6 +5,7 @@ import collections
 from skimage import img_as_float, img_as_ubyte
 from skimage import transform
 from skimage.metrics import structural_similarity as ssim
+from skimage.feature import match_template
 from scipy.spatial import distance
 from scipy.fftpack import fft2
 
@@ -242,6 +243,7 @@ class ImageProcess(object):
     @staticmethod
     def select_reference_points(image):
         points = []
+        point_shape = 25
         alpha = 50
         beta = 1.5
 
@@ -249,7 +251,8 @@ class ImageProcess(object):
 
         def select_point(event, x, y, flags, param):
             if event == cv2.EVENT_LBUTTONUP:
-                cv2.circle(new_image, (x, y), 5, (255, 0, 0), 1)
+                cv2.rectangle(new_image, (x - point_shape, y - point_shape), (x + point_shape, y + point_shape),
+                              (255, 0, 0), 1)
                 points.append((x, y))
                 cv2.putText(new_image, str(len(points)), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 4, cv2.LINE_AA)
                 print(str(len(points)), ". point: ", (x, y))
@@ -268,20 +271,26 @@ class ImageProcess(object):
         gray = img_as_float(ImageProcess.to_gray(image))
         selected_points = {}
         for (x, y) in points:
-            selected_points[(x, y)] = gray[y, x]
+            selected_points[(x, y)] = gray[y - point_shape:y + point_shape, x - point_shape:x + point_shape]
 
-        print("Selected points:\t", selected_points)
+        print("Selected points:\t", str(selected_points.keys()))
         return selected_points
 
     @staticmethod
     def tracking_points(selected_points, image):
         tracked_points = []
         image = img_as_float(ImageProcess.to_gray(image))
-        for (x, y), value in selected_points.items():
-            t_x, t_y = ImageProcess.find_point(image, x, y, value)
-            tracked_points.append((t_x, t_y))
-
+        # for (x, y), value in selected_points.items():
+        #     t_x, t_y = ImageProcess.find_point(image, x, y, value)
+        #     tracked_points.append((t_x, t_y))
         # print("Tracked points:\t\t", tracked_points)
+
+        for (x, y), template in selected_points.items():
+            result = match_template(image, template)
+            ij = np.unravel_index(np.argmax(result), result.shape)
+            tracked_point = ij[::-1]
+            tracked_points.append(tracked_point)
+
         return tracked_points
 
     @staticmethod

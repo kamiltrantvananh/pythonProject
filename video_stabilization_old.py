@@ -5,7 +5,6 @@ from pandas import *
 import cv2
 import numpy as np
 from skimage import img_as_float
-from skimage.metrics import structural_similarity as ssim
 from matplotlib import pyplot as plt
 
 from img_process_old import ImageProcess
