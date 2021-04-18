@@ -39,8 +39,8 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
         selected_points = {}
     capture = cv2.VideoCapture(f_name)
 
-    CROP_X = 258
-    CROP_Y = 488
+    CROP_X = 100
+    CROP_Y = 100
 
     frames = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
     frame_size = (int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)), int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
@@ -124,7 +124,10 @@ def stabilize_video(f_name, use_first_as_reference=False, print_full_results=Fal
 
 def boxplot_euclids(euclid_distances):
     euclids = get_euclid_distance_per_point(euclid_distances)
-    plt.boxplot(euclids)
+    plt.boxplot(euclids, notch=True)
+    plt.xlabel("Vybrané body (-)")
+    plt.ylabel("Euklidovská vzdialenosť (-)")
+    plt.title("Variabilita euklidovských vzdialeností vybraných bodov")
     plt.show()
     plt.savefig('Euclid distances.png')
 
@@ -192,6 +195,17 @@ def main(argv):
     for file_path in file_paths:
         stabilize_video(file_path, use_first_as_reference=first_as_reference, selected_points=selected_points)
 
+# mean image as a reference
+#def mean_image(f_name, frames):
+#    capture = cv2.VideoCapture(f_name)
+#    while True:
+#        ret, image = capture.read()
+#        if ret:
+#            # is there
+#            np.mean(image)/frames
+#        else:
+#            break
+#    return ref_image = np.mean(image)/frames
 
 if __name__ == '__main__':
     main(sys.argv[1:])

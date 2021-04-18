@@ -84,7 +84,7 @@ class ImageProcess(object):
         print_result['scale'] = scale
         print_result['rotation'] = rotation
         centre = (cols // 2, rows // 2)
-        transformation_matrix = cv2.getRotationMatrix2D(centre, rotation, 1)
+        transformation_matrix = cv2.getRotationMatrix2D(centre, rotation, scale)
         flags = cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP | cv2.BORDER_REPLICATE
         (img2_y, img2_x, _) = img2.shape
         result_image = cv2.warpAffine(img2, transformation_matrix, dsize=(img2_x, img2_y), flags=flags)
